@@ -1,0 +1,8 @@
+﻿<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><title>冷凍空調智慧控制與熱負荷預測教學簡報</title>
+<style>body{font-family:sans-serif;background:#0f172a;color:#e2e8f0;padding:40px}.card{max-width:860px;margin:auto;background:#1e293b;padding:32px;border-radius:14px}.slide{display:none}.slide.active{display:block}.btns{margin-top:24px}button{padding:8px 16px;margin-right:8px;cursor:pointer}</style></head>
+<body><div class="card"><div id="s">
+<div class="slide active"><h1>冷氣與冰水主機怎麼變聰明？</h1><p>認識 HVAC、Chiller Scheduling 與 Short-Term Thermal Load Forecasting（COP、PLR、RMSE）。</p></div>
+<div class="slide"><h2>預測與控制模型</h2><p>涵蓋 MPC、PPO、Receding Horizon、TimeXer、Monotonic Neural Network、ThermoForce 與 EMD-LSTM-Markov。</p></div>
+<div class="slide"><h2>關鍵提醒</h2><p>預測準確度高不代表控制介入也準確，需兼顧舒適度、約束與極端尖峰限制。</p></div>
+</div><div class="btns"><button onclick="n(-1)">上一頁</button><button onclick="n(1)">下一頁</button></div></div>
+<script>let i=0,d=document.querySelectorAll('.slide');function n(x){d[i].classList.remove('active');i=Math.min(d.length-1,Math.max(0,i+x));d[i].classList.add('active')}</script></body></html>
