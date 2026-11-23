@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>冷氣與冰水主機怎麼變聰明？｜冷凍空調智慧控制與熱負荷預測（5 篇論文整合簡報）</title>
+  <style>
+    :root {
+      --bg-outer: #070d19;
+      --bg-slide: #0f172a;
+      --bg-card: #162238;
+      --bg-card-alt: #1b2a47;
+      --accent: #38bdf8;
+      --accent-soft: rgba(56, 189, 248, 0.14);
+      --green: #34d399;
+      --green-soft: rgba(52, 211, 153, 0.14);
+      --amber: #fbbf24;
+      --amber-soft: rgba(251, 191, 36, 0.12);
+      --purple: #a78bfa;
+      --purple-soft: rgba(167, 139, 250, 0.14);
+      --text: #f1f5f9;
+      --text-sub: #cbd5e1;
+      --muted: #94a3b8;
+      --border: rgba(148, 163, 184, 0.2);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at 20% 10%, #172554 0%, var(--bg-outer) 65%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top Bar */
+    .topbar {
+      height: 54px;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(7, 13, 25, 0.85);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+      z-index: 20;
+    }
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--accent);
+    }
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+    }
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .pill-btn {
+      background: rgba(148, 163, 184, 0.12);
+      color: var(--text-sub);
+      border: 1px solid var(--border);
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .pill-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .slide-num {
+      font-variant-numeric: tabular-nums;
+      font-size: 0.88rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    /* Progress Bar */
+    .progress-track {
+      width: 100%;
+      height: 3px;
+      background: rgba(148, 163, 184, 0.15);
+    }
+    .progress-fill {
+      height: 100%;
+      width: 10%;
+      background: linear-gradient(90deg, var(--accent), var(--green));
+      transition: width 0.25s ease;
+    }
+
+    /* Stage */
+    .stage {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .slide-frame {
+      width: 100%;
+      max-width: 1120px;
+      min-height: 580px;
+      background: linear-gradient(160deg, #111c33 0%, var(--bg-slide) 100%);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px 48px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.55);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .slide { display: none; animation: slideIn 0.28s ease; }
+    .slide.active { display: block; }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 13px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      margin-bottom: 14px;
+    }
+    .kicker.green { background: var(--green-soft); color: var(--green); border-color: rgba(52, 211, 153, 0.3); }
+    .kicker.amber { background: var(--amber-soft); color: var(--amber); border-color: rgba(251, 191, 36, 0.3); }
+    .kicker.purple { background: var(--purple-soft); color: var(--purple); border-color: rgba(167, 139, 250, 0.3); }
+
+    h1 {
+      font-size: 2.25rem;
+      line-height: 1.28;
+      font-weight: 800;
+      margin-bottom: 14px;
+      letter-spacing: -0.3px;
+    }
+    h2 {
+      font-size: 1.65rem;
+      line-height: 1.32;
+      font-weight: 700;
+      margin-bottom: 14px;
+      color: #f8fafc;
+    }
+    .lead {
+      font-size: 1.03rem;
+      line-height: 1.7;
+      color: var(--text-sub);
+      margin-bottom: 20px;
+    }
+    p { line-height: 1.68; color: var(--text-sub); font-size: 0.96rem; }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background: rgba(56, 189, 248, 0.13);
+      color: #7dd3fc;
+      padding: 2px 6px;
+      border-radius: 5px;
+      font-size: 0.88em;
+    }
+
+    /* Grids & Cards */
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 12px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 12px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 10px; }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+    }
+    .card h3 {
+      font-size: 1.05rem;
+      color: #f8fafc;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .badge {
+      font-size: 0.74rem;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: rgba(148, 163, 184, 0.16);
+      color: var(--text-sub);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge.green { background: var(--green-soft); color: var(--green); }
+    .badge.amber { background: var(--amber-soft); color: var(--amber); }
+    .badge.accent { background: var(--accent-soft); color: var(--accent); }
+
+    ul.clean { list-style: none; padding: 0; }
+    ul.clean li {
+      position: relative;
+      padding-left: 18px;
+      margin-bottom: 8px;
+      line-height: 1.62;
+      color: var(--text-sub);
+      font-size: 0.94rem;
+    }
+    ul.clean li::before {
+      content: "▸";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .callout {
+      margin-top: 16px;
+      padding: 14px 18px;
+      border-radius: 12px;
+      background: var(--amber-soft);
+      border-left: 4px solid var(--amber);
+      color: #fef3c7;
+      font-size: 0.94rem;
+      line-height: 1.6;
+    }
+    .callout.blue {
+      background: var(--accent-soft);
+      border-left-color: var(--accent);
+      color: #e0f2fe;
+    }
+
+    /* Flow Diagram */
+    .flow-row {
+      display: flex;
+      align-items: stretch;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 18px 0;
+    }
+    .flow-step {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      position: relative;
+    }
+    .flow-step .step-no {
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .flow-step h4 { font-size: 1.02rem; margin-bottom: 8px; color: #fff; }
+    .flow-arrow {
+      display: flex;
+      align-items: center;
+      color: var(--accent);
+      font-size: 1.4rem;
+      font-weight: 800;
+    }
+
+    /* Comparison Table */
+    .table-wrap {
+      overflow-x: auto;
+      margin-top: 10px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+    th {
+      background: #1e293b;
+      color: var(--accent);
+      font-weight: 700;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 9px 12px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+      color: var(--text-sub);
+      vertical-align: top;
+      line-height: 1.5;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: rgba(15, 23, 42, 0.45); }
+
+    /* Stat highlights */
+    .stat-row { display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+    .stat-box {
+      flex: 1;
+      min-width: 130px;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .stat-val { font-size: 1.25rem; font-weight: 800; color: var(--green); }
+    .stat-lbl { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+
+    /* Footer Controls */
+    .footer-bar {
+      height: 60px;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(7, 13, 25, 0.9);
+      border-top: 1px solid var(--border);
+    }
+    .hint { font-size: 0.84rem; color: var(--muted); }
+    .nav-btns { display: flex; gap: 10px; }
+    .btn {
+      padding: 9px 20px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #061224;
+    }
+    .btn-primary:hover:not(:disabled) { background: #7dd3fc; }
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .btn-secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* Overview Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 7, 18, 0.82);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 50;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-box {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      max-width: 820px;
+      width: 100%;
+      padding: 24px;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 12px;
+    }
+    .ov-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      cursor: pointer;
+      text-align: left;
+      color: var(--text);
+    }
+    .ov-item:hover, .ov-item.current { border-color: var(--accent); background: var(--bg-card-alt); }
+    .ov-num { font-size: 0.75rem; color: var(--accent); font-weight: 700; margin-bottom: 4px; }
+    .ov-title { font-size: 0.9rem; font-weight: 600; line-height: 1.4; }
+
+    @media (max-width: 820px) {
+      .slide-frame { padding: 24px 20px; min-height: auto; }
+      h1 { font-size: 1.65rem; }
+      h2 { font-size: 1.32rem; }
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .flow-row { flex-direction: column; }
+      .flow-arrow { justify-content: center; transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="dot"></span>
+      <span>HVAC LLM Wiki｜五篇冷凍空調論文整合教學簡報</span>
+    </div>
+    <div class="topbar-right">
+      <button class="pill-btn" onclick="toggleOverview()">投影片目錄 (G)</button>
+      <span class="slide-num" id="slideCounter">01 / 10</span>
+    </div>
+  </header>
+
+  <div class="progress-track">
+    <div class="progress-fill" id="progressBar"></div>
+  </div>
+
+  <main class="stage">
+    <div class="slide-frame">
+
+      <!-- SLIDE 1: Cover -->
+      <section class="slide active" data-title="封面：冷氣與冰水主機怎麼變聰明？">
+        <span class="kicker">LLM Wiki 知識轉化・零基礎教學簡報</span>
+        <h1>冷氣與冰水主機怎麼變聰明？<br/>冷凍空調智慧控制與短期熱負荷預測</h1>
+        <p class="lead">整合 5 篇 <code>arXiv</code> 前沿研究（2021–2026），帶你從零理解建築空調系統（<code>HVAC</code>）、冰水主機群最佳化（<code>Chiller Scheduling</code>）與短期熱負荷預測（<code>Short-Term Thermal Load Forecasting</code>）的核心邏輯。</p>
+        <div class="grid-3">
+          <div class="card">
+            <h3>1. 提前看懂需求 <span class="badge accent">預測</span></h3>
+            <p>利用 <code>TimeXer</code> 與 <code>EMD-LSTM-Markov</code> 等混合模型，提前數小時至 24 小時預估建築冷／熱負荷。</p>
+          </div>
+          <div class="card">
+            <h3>2. 守住物理規律 <span class="badge green">建模</span></h3>
+            <p>透過 <code>Monotonic Neural Network</code> 與 <code>ThermoForce</code> 融入物理單調性與介入因果結構。</p>
+          </div>
+          <div class="card">
+            <h3>3. 做出最佳決策 <span class="badge amber">控制</span></h3>
+            <p>結合 <code>MPC</code> 與 <code>PPO</code>（<code>Receding Horizon</code>）動態調控冰水流量與主機啟停，兼顧節能與舒適。</p>
+          </div>
+        </div>
+        <div class="callout blue">
+          <strong>導讀對象：</strong>本簡報專為原本不熟悉冷凍空調工程或控制演算法的讀者設計，所有專有名詞與指標皆附白話解釋與實證數據。
+        </div>
+      </section>
+
+      <!-- SLIDE 2: Problem Background -->
+      <section class="slide" data-title="為什麼傳統空調控制又耗電又難調？">
+        <span class="kicker amber">問題背景・從定值規則走向前瞻智慧控制</span>
+        <h2>為什麼傳統空調與冰水系統需要升級？</h2>
+        <p class="lead">大型建築與校園的中央空調消耗大量電力，但室內冷／熱需求會隨天氣、日照與人員活動劇烈波動。</p>
+        <div class="grid-2">
+          <div class="card">
+            <h3>傳統做法：被動式定值規則 <span class="badge">Rule-Based</span></h3>
+            <ul class="clean">
+              <li>常見做法如上班時段固定冰水出水溫度約 <code>6 °C</code>、非上班時段調為 <code>11 °C</code>，等負載變化才被動調整流量（<code>arXiv:2511.14160</code>）。</li>
+              <li><strong>缺點 1（反應太慢）</strong>：冰水主機啟動與熱傳遞有時間延遲，等變熱才開機往往已經太晚。</li>
+              <li><strong>缺點 2（缺乏全域協調）</strong>：多台主機效率不同，被動控制容易讓機組長期落在低效率區間或頻繁啟停。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>智慧做法：預測 ＋ 物理模型 ＋ 最佳控制 <span class="badge green">AI + Physics</span></h3>
+            <ul class="clean">
+              <li>提前預測未來 24 小時冷／熱負荷變化，預先規劃主機啟停與流量分配。</li>
+              <li>用熱動態世界模型模擬「如果現在調高／調低出力，未來幾小時溫度與電費會怎麼變」。</li>
+              <li>在溫度舒適區間與設備安全硬性約束下，自動尋找總耗電最低的控制策略。</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout">
+          <strong>生活類比（教學輔助）：</strong>傳統控制就像開車時「只盯著車頭前 1 公尺」，看到塞車才急煞、空曠才猛踩油門；智慧控制則像開啟導航與前方路況預測，提早平順加減速，既省油又舒適。
+        </div>
+      </section>
+
+      <!-- SLIDE 3: Key Terminology & Metrics -->
+      <section class="slide" data-title="零基礎必懂：4 個關鍵技術名詞與指標">
+        <span class="kicker">核心語言・看懂論文數據的 4 把鑰匙</span>
+        <h2>閱讀這五篇論文前，先認識 4 個關鍵詞</h2>
+        <div class="grid-4">
+          <div class="card">
+            <h3><code>HVAC</code> <span class="badge accent">系統總稱</span></h3>
+            <p>Heating, Ventilation, and Air Conditioning（暖通空調系統），涵蓋冷熱源主機（如冰水主機 <code>Chiller</code>）、水泵、風機與室內末端空調區域。</p>
+          </div>
+          <div class="card">
+            <h3><code>COP</code> <span class="badge green">越「高」越省電</span></h3>
+            <p>Coefficient of Performance（效能係數）＝「製冷量 ÷ 消耗電功率」。代表每花 1 度電能搬走多少熱量；論文案例中透過智慧排程從 <code>8.03</code> 提升至 <code>8.81</code>。</p>
+          </div>
+          <div class="card">
+            <h3><code>PLR</code> <span class="badge amber">負載比例</span></h3>
+            <p>Part Load Ratio（部分負載率）＝「實際運轉冷負荷 ÷ 主機額定最大容量」。主機在太低或過高 <code>PLR</code> 時效率會下降，合理分配多機 <code>PLR</code> 是節能關鍵。</p>
+          </div>
+          <div class="card">
+            <h3><code>RMSE</code> <span class="badge purple">越「低」越準確</span></h3>
+            <p>Root Mean Square Error（均方根誤差），衡量模型預測溫度（單位 <code>K</code>）或熱負荷與真實值的平均偏差程度。</p>
+          </div>
+        </div>
+        <div class="callout blue">
+          <strong>記憶口訣：</strong>看設備省不省電看 <code>COP</code>（越高越好）與 <code>PLR</code>；看模型預報準不準看 <code>RMSE</code>（越低越好）。
+        </div>
+      </section>
+
+      <!-- SLIDE 4: Overall 5-Paper Architecture -->
+      <section class="slide" data-title="五篇論文全景圖：智慧空調的三層大腦架構">
+        <span class="kicker green">系統全景・五篇論文如何互補？</span>
+        <h2>五篇論文拼出完整的「智慧空調決策鏈」</h2>
+        <p class="lead">單一演算法無法包辦所有問題，這五篇論文剛好分別解決了<strong>「預報未來」、「看懂物理因果」與「多機／多建築最佳控制」</strong>三個環節：</p>
+        <div class="flow-row">
+          <div class="flow-step">
+            <div class="step-no">第一層：前瞻預報</div>
+            <h4>短期熱負荷預測</h4>
+            <p>提前預估未來數小時至 24 小時冷／熱需求，避免系統反應落後。</p>
+            <p style="margin-top:8px;">代表論文：<br/><code>arXiv:2610.06881</code>（混合預測綜述）<br/><code>arXiv:2511.14160</code>（<code>TimeXer</code>）</p>
+          </div>
+          <div class="flow-arrow">➔</div>
+          <div class="flow-step">
+            <div class="step-no">第二層：物理與世界模型</div>
+            <h4>結構化熱動態與能耗建模</h4>
+            <p>融入物理單調性與介入因果結構，避免小樣本失真或控制方向算錯。</p>
+            <p style="margin-top:8px;">代表論文：<br/><code>arXiv:2106.06143</code>（<code>Monotonic NN</code>）<br/><code>arXiv:2607.03942</code>（<code>ThermoForce</code>）<br/><code>arXiv:2505.02439</code>（<code>Ensemble</code>）</p>
+          </div>
+          <div class="flow-arrow">➔</div>
+          <div class="flow-step">
+            <div class="step-no">第三層：最佳決策執行</div>
+            <h4>滾動式排程與控制最佳化</h4>
+            <p>在溫度舒適與設備安全約束下，動態求解最佳水流量、主機啟停與送風策略。</p>
+            <p style="margin-top:8px;">代表論文：<br/><code>arXiv:2511.14160</code>（<code>PPO</code>）<br/><code>arXiv:2505.02439</code> & <code>2607.03942</code>（<code>MPC</code>）</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 5: Chiller Plant Papers (Ma 2021 + Musgrave 2025) -->
+      <section class="slide" data-title="冰水主機群最佳化：Ma (2021) 與 Musgrave (2025)">
+        <span class="kicker">深度解析 1・冰水主機房（Chiller Plant）節能控制</span>
+        <h2>如何讓多台冰水主機「合作省電」？</h2>
+        <div class="grid-2">
+          <div class="card">
+            <h3><code>arXiv:2106.06143</code>｜Ma et al. (2021) <span class="badge green">物理約束建模</span></h3>
+            <p style="font-size:0.84rem;color:var(--accent);margin-bottom:8px;">Monotonic Neural Network: combining Deep Learning with Domain Knowledge for Chiller Plants Energy Optimization</p>
+            <ul class="clean">
+              <li><strong>痛點</strong>：真實冰水主機房運轉數據有限（小樣本），無約束深度網路容易在未見過的工況下給出違反熱力學直覺的能耗預測。</li>
+              <li><strong>解方</strong>：提出 <code>Monotonic Neural Network</code>，把領域知識中的單調性（<code>monotonicity</code>）直接嵌入神經網路結構與訓練中，壓縮不合理函數空間。</li>
+              <li><strong>成果</strong>：在資料中心冷卻系統（<code>data center cooling system</code>）驗證中，展現優於既有基準方法的能耗最佳化效果。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3><code>arXiv:2511.14160</code>｜Musgrave et al. (2025) <span class="badge amber">RL 排程實證</span></h3>
+            <p style="font-size:0.84rem;color:var(--accent);margin-bottom:8px;">A Receding Horizon Reinforcement Learning Framework for Campus Chiller Energy Management</p>
+            <ul class="clean">
+              <li><strong>解方</strong>：結合 <code>TimeXer</code>（24 小時冷負荷預測）與 <code>PPO</code> 強化學習的 <code>Receding Horizon</code> 框架，調控四台冰水主機的冰水質量流率（<code>mass flow rates</code>）與啟停。</li>
+              <li><strong>約束設計</strong>：能量平衡與回水溫度設為硬性約束；頻繁啟停懲罰納入 <code>reward function</code>。</li>
+            </ul>
+            <div class="stat-row">
+              <div class="stat-box"><div class="stat-val">-28%</div><div class="stat-lbl">較規則控制節電（66.49 vs 92.35 MWh）</div></div>
+              <div class="stat-box"><div class="stat-val">8.81</div><div class="stat-lbl">平均 COP（原 8.03）</div></div>
+              <div class="stat-box"><div class="stat-val">0.83</div><div class="stat-lbl">平均 PLR（原 0.81）</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 6: Building Zone MPC & World Model (Deng 2025 + Wang 2026) -->
+      <section class="slide" data-title="建築區域溫控：Deng (2025) 與 Wang (2026)">
+        <span class="kicker purple">深度解析 2・建築熱動態與模型預測控制（MPC）</span>
+        <h2>從「跨建築擴展」到「看懂控制因果」</h2>
+        <div class="grid-2">
+          <div class="card">
+            <h3><code>arXiv:2505.02439</code>｜Deng et al. (2025) <span class="badge accent">多建築擴展</span></h3>
+            <p style="font-size:0.84rem;color:var(--accent);margin-bottom:8px;">Towards Machine Learning-based Model Predictive Control for HVAC Control in Multi-Context Buildings at Scale via Ensemble Learning</p>
+            <ul class="clean">
+              <li><strong>痛點</strong>：每棟建築、每間房間都要重新挑變數、收集大量資料訓練熱力學模型，導致 <code>ML-based MPC</code> 難以大規模推廣。</li>
+              <li><strong>解方</strong>：利用 <code>Ensemble Learning</code> 整合多個既有環境訓練出的基礎模型權重，並提出基於 <code>Hierarchical Reinforcement Learning</code> 的動態模型集成（對照靜態 <code>BOA</code> / <code>GP</code>）。</li>
+              <li><strong>驗證</strong>：於 65 間房資料集（52 間建構基礎模型）進行離線實驗與實地驗證，有效降低資料稀缺目標空間的預測誤差。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3><code>arXiv:2607.03942</code>｜Wang (2026) <span class="badge green">介入式世界模型</span></h3>
+            <p style="font-size:0.84rem;color:var(--accent);margin-bottom:8px;">ThermoForce: A Physics-Structured Interventional World Model for Building HVAC Control</p>
+            <ul class="clean">
+              <li><strong>核心洞見</strong>：被動預測準確度高 ≠ <code>MPC</code> 評估控制動作介入（<code>intervention</code>）時也準確！</li>
+              <li><strong>解方</strong>：<code>ThermoForce</code> 將未來溫度拆為「自由響應（<code>free response</code>，由凍結的 <code>TSFM</code> 預測）」＋「受迫響應（<code>forced response</code>，具物理單調性的控制算子）」，僅需 1–3 天激勵資料即可辨識。</li>
+            </ul>
+            <div class="stat-row">
+              <div class="stat-box"><div class="stat-val">0.751 K</div><div class="stat-lbl">加熱介入 RMSE（grey-box 為 1.360 K）</div></div>
+              <div class="stat-box"><div class="stat-val">-33~84%</div><div class="stat-lbl">BOPTEST 不舒適度降低</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 7: Short-Term Thermal Load Forecasting (Efkarpidis 2026) -->
+      <section class="slide" data-title="短期熱負荷混合預測綜述：Efkarpidis (2026)">
+        <span class="kicker green">深度解析 3・短期熱負荷預測（Short-Term Thermal Load Forecasting）</span>
+        <h2>哪種預測模型最適合建築短期熱負荷？</h2>
+        <p class="lead"><code>arXiv:2610.06881</code>（Efkarpidis et al., 2026）系統比較了建築短期熱負荷預測的物理白箱、純資料驅動與 13 種混合模型（<code>hybrid models</code>）：</p>
+        <div class="grid-3">
+          <div class="card">
+            <h3>三大模型家族 <span class="badge accent">方法分類</span></h3>
+            <ul class="clean">
+              <li><strong>白箱物理模型</strong>：如簡化熱阻熱容網路 <code>1R1C</code>，物理意義明確但參數率定耗時。</li>
+              <li><strong>資料驅動模型</strong>：樹模型 <code>XGB</code>、<code>RF</code> 與深度序列網路 <code>LSTM</code>、<code>GRU</code>。</li>
+              <li><strong>混合模型</strong>：結合訊號分解（<code>EMD</code>）、馬可夫鏈或啟發式最佳化（<code>metaheuristics</code>）的複合架構。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>關鍵比較發現 <span class="badge green">實驗結論</span></h3>
+            <ul class="clean">
+              <li>不同預測時間尺度（數小時至數天）與資料條件下，沒有單一模型能在所有場景通吃。</li>
+              <li>在 13 種混合模型基準測試中，<code>EMD-LSTM-Markov</code> 對日前（<code>day-ahead</code>）加熱與生活熱水需求展現最高整體準確度。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>尚未解決的痛點 <span class="badge amber">尖峰挑戰</span></h3>
+            <ul class="clean">
+              <li>面對突發的劇烈用能尖峰（<code>high power swells and spikes</code>），即便表現最佳的混合模型仍存在低估風險。</li>
+              <li><strong>啟示</strong>：下游控制器（<code>MPC</code> / <code>PPO</code>）必須保留安全裕度，不能盲信單點預測值。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 8: Master Comparison Matrix -->
+      <section class="slide" data-title="五篇論文全景對照矩陣">
+        <span class="kicker">跨文獻綜合・一張表看懂五篇論文異同</span>
+        <h2>五篇冷凍空調論文全景比較矩陣</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:17%;">論文來源</th>
+                <th style="width:18%;">研究場景與問題</th>
+                <th style="width:23%;">核心模型與方法</th>
+                <th style="width:22%;">關鍵指標與量化成果</th>
+                <th style="width:20%;">主要限制 / Research Gap</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Deng et al. (2025)</strong><br/><code>arXiv:2505.02439</code></td>
+                <td>多建築／多房間 <code>HVAC</code> <code>MPC</code> 規模化部署</td>
+                <td><code>Ensemble Learning</code>、<code>Hierarchical RL</code>、<code>BOA</code>、<code>GP</code>、<code>MPC</code></td>
+                <td>65 間房資料集驗證，降低目標建築資料稀缺時的熱力學預測誤差</td>
+                <td>跨異質建築結構與感測器配置之適應性仍待驗證</td>
+              </tr>
+              <tr>
+                <td><strong>Musgrave et al. (2025)</strong><br/><code>arXiv:2511.14160</code></td>
+                <td>校園四台冰水主機群（<code>Chiller Bank</code>）最佳排程</td>
+                <td><code>Receding Horizon</code> + <code>PPO</code> + <code>TimeXer</code>（調控冰水質量流率）</td>
+                <td>耗電降 <code>28%</code>（<code>66.49</code> vs <code>92.35 MWh</code>），<code>COP</code> <code>8.81</code>，<code>PLR</code> <code>0.83</code></td>
+                <td>實場部署需考量硬體安全保護與多設備動態耦合</td>
+              </tr>
+              <tr>
+                <td><strong>Ma et al. (2021)</strong><br/><code>arXiv:2106.06143</code></td>
+                <td>資料中心冰水主機房小樣本能耗最佳化</td>
+                <td><code>Monotonic Neural Network</code>（領域知識單調性約束）</td>
+                <td>在有限運轉數據下有效提升系統能耗最佳化表現</td>
+                <td>嚴格全域單調假設需視變數物理特性謹慎設計</td>
+              </tr>
+              <tr>
+                <td><strong>Wang (2026)</strong><br/><code>arXiv:2607.03942</code></td>
+                <td>建築區域 <code>HVAC</code> 控制介入因果失真問題</td>
+                <td><code>ThermoForce</code>（凍結 <code>TSFM</code> 自由響應 + 單調受迫響應算子）+ <code>MPC</code></td>
+                <td>加熱介入 <code>RMSE</code> <code>0.751 K</code>（優於 <code>grey-box</code> <code>1.360 K</code>）；不舒適度降 <code>33–84%</code></td>
+                <td>需 1–3 天控制激勵資料辨識，多機離散啟停耦合待驗證</td>
+              </tr>
+              <tr>
+                <td><strong>Efkarpidis et al. (2026)</strong><br/><code>arXiv:2610.06881</code></td>
+                <td>建築短期熱負荷混合預測模型比較綜述</td>
+                <td><code>EMD-LSTM-Markov</code>、<code>XGB</code>、<code>RF</code>、<code>LSTM</code>、<code>GRU</code>、<code>1R1C</code></td>
+                <td>比較 13 種混合模型，<code>EMD-LSTM-Markov</code> 日前整體準確度最高</td>
+                <td>對突發劇烈尖峰（<code>spikes / swells</code>）仍有低估現象</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- SLIDE 9: Key Insights & Research Gaps -->
+      <section class="slide" data-title="跨文獻洞察與未來研究缺口（Research Gaps）">
+        <span class="kicker amber">批判性思考・從文獻整理出的三大關鍵洞見</span>
+        <h2>把五篇論文放在一起看，我們發現了什麼？</h2>
+        <div class="grid-3">
+          <div class="card">
+            <h3>洞見 1：預測準 ≠ 控制準 <span class="badge amber">因果鴻溝</span></h3>
+            <p>觀測型模型即使被動預測 <code>RMSE</code> 很低（如 <code>0.761 K</code>），在 <code>MPC</code> 測試不同控制指令時介入誤差卻可能飆升至 <code>1.360 K</code>（<code>ThermoForce</code>）。控制模型必須分離「環境自然變化」與「人為控制因果」。</p>
+          </div>
+          <div class="card">
+            <h3>洞見 2：物理單調性是小樣本護欄 <span class="badge green">結構先驗</span></h3>
+            <p>從 2021 年的 <code>Monotonic Neural Network</code> 到 2026 年的 <code>ThermoForce</code>，兩者皆證明：將熱力學單調關係嵌入神經網路或世界模型，能大幅減少現場收集試錯資料的成本。</p>
+          </div>
+          <div class="card">
+            <h3>洞見 3：三大未來研究缺口 <span class="badge purple">Research Gaps</span></h3>
+            <ul class="clean">
+              <li><strong>尖峰防禦</strong>：如何修正 <code>EMD-LSTM-Markov</code> 等模型對突發尖峰的低估？</li>
+              <li><strong>離散耦合</strong>：如何把 <code>ThermoForce</code> 延伸至多台冰水主機的離散啟停與流量耦合？</li>
+              <li><strong>跨建築泛化</strong>：如何結合 <code>Ensemble Learning</code> 與物理結構模型？</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout">
+          <strong>學術規範提醒（區分事實與推論）：</strong>上述各篇數據皆直接引自原始論文；將 <code>ThermoForce</code> 與多機組 <code>Chiller Bank</code> 結合則屬於基於本知識庫交叉比對後提出的「推論／待驗證研究方向」。
+        </div>
+      </section>
+
+      <!-- SLIDE 10: Workflow & Summary -->
+      <section class="slide" data-title="總結與 LLM Wiki 知識庫建構迴圈">
+        <span class="kicker green">總結回顧・本簡報如何由 LLM Wiki 自動演化而成</span>
+        <h2>重點回顧與 LLM Wiki 運作流程</h2>
+        <div class="grid-2">
+          <div class="card">
+            <h3>本簡報核心重點回顧</h3>
+            <ul class="clean">
+              <li><strong>看懂指標</strong>：<code>COP</code> 衡量製冷能效、<code>PLR</code> 衡量主機負載分配、<code>RMSE</code> 衡量預測與控制介入誤差。</li>
+              <li><strong>看懂技術拼圖</strong>：用混合序列模型預測負荷（<code>TimeXer</code>、<code>EMD-LSTM-Markov</code>）→ 用物理單調與世界模型守住因果（<code>Monotonic NN</code>、<code>ThermoForce</code>）→ 用 <code>MPC</code> 與 <code>PPO</code> 執行節能排程。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>LLM Wiki 建構與檢查迴圈（Loop）</h3>
+            <ul class="clean">
+              <li><strong>1. Ingest</strong>：逐篇精讀 5 篇 <code>arXiv</code> 論文並建立結構化 <code>wiki/sources/</code>、<code>concepts/</code>、<code>methods/</code> 與 <code>synthesis/</code>。</li>
+              <li><strong>2. Pre-Generation Check</strong>：簡報生成前強制核對來源出處、英文專有名詞／指標保留，以及是否誤把「預測準」寫成「控制準」。</li>
+              <li><strong>3. Generate & Lint</strong>：產出本份互動式 HTML 簡報，並持續透過 <code>wiki/log.md</code> 追蹤修正。</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout blue">
+          <strong>完整知識庫檔案索引：</strong>欲查閱單篇文獻深度筆記與跨篇合成報告，請瀏覽 GitHub 儲存庫中的 <code>wiki/index.md</code>、<code>wiki/sources/</code> 與 <code>wiki/synthesis/syn-hvac-control-and-forecasting.md</code>。
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="footer-bar">
+    <div class="hint">操作提示：按鍵盤 <code>←</code> / <code>→</code> 或 <code>Space</code> 切換投影片，按 <code>G</code> 開啟目錄總覽</div>
+    <div class="nav-btns">
+      <button class="btn btn-secondary" id="prevBtn" onclick="changeSlide(-1)">← 上一頁</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="changeSlide(1)">下一頁 →</button>
+    </div>
+  </footer>
+
+  <!-- Overview Modal -->
+  <div class="modal-backdrop" id="overviewModal" onclick="if(event.target===this) toggleOverview()">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3 style="color:#fff;">投影片總覽（點擊跳轉）</h3>
+        <button class="pill-btn" onclick="toggleOverview()">關閉 (Esc)</button>
+      </div>
+      <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+  </div>
+
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const counterEl = document.getElementById('slideCounter');
+    const progressEl = document.getElementById('progressBar');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const modal = document.getElementById('overviewModal');
+    const overviewGrid = document.getElementById('overviewGrid');
+    let current = 0;
+
+    function buildOverview() {
+      overviewGrid.innerHTML = '';
+      slides.forEach((s, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'ov-item' + (idx === current ? ' current' : '');
+        btn.innerHTML = `<div class="ov-num">SLIDE ${String(idx + 1).padStart(2, '0')}</div><div class="ov-title">${s.dataset.title || '第 ' + (idx + 1) + ' 頁'}</div>`;
+        btn.onclick = () => {
+          goToSlide(idx);
+          toggleOverview();
+        };
+        overviewGrid.appendChild(btn);
+      });
+    }
+
+    function goToSlide(index) {
+      current = Math.max(0, Math.min(slides.length - 1, index));
+      slides.forEach((s, idx) => s.classList.toggle('active', idx === current));
+      counterEl.textContent = `${String(current + 1).padStart(2, '0')} / ${String(slides.length).padStart(2, '0')}`;
+      progressEl.style.width = `${((current + 1) / slides.length) * 100}%`;
+      prevBtn.disabled = current === 0;
+      nextBtn.disabled = current === slides.length - 1;
+      buildOverview();
+    }
+
+    function changeSlide(delta) {
+      goToSlide(current + delta);
+    }
+
+    function toggleOverview() {
+      modal.classList.toggle('open');
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal.classList.contains('open')) {
+        toggleOverview();
+        return;
+      }
+      if (e.key === 'g' || e.key === 'G') {
+        toggleOverview();
+        return;
+      }
+      if (modal.classList.contains('open')) return;
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault();
+        changeSlide(1);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        changeSlide(-1);
+      }
+    });
+
+    goToSlide(0);
+  </script>
+</body>
+</html>
